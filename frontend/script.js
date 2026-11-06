@@ -231,30 +231,30 @@ async function fetchConfig() {
     }
 }
 
-// 导出数据: GET /api/domains
+// 导出完整备份: GET /api/backup（域名列表 + 通知设置）
 async function exportData() {
     try {
-        const response = await fetch(DOMAINS_API);
-        if (!response.ok) throw new Error('获取数据失败');
+        const response = await fetch('/api/backup');
+        if (!response.ok) throw new Error('获取备份数据失败');
 
         const data = await response.json();
         const jsonString = JSON.stringify(data, null, 2);
         const blob = new Blob([jsonString], { type: 'application/json' });
-        
+
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         const date = new Date().toISOString().split('T')[0];
-        a.download = \`domain_list_backup_\${date}.json\`;
-        
+        a.download = \`domain-check_backup_\${date}.json\`;
+
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        showSuccess('域名数据已成功导出为 JSON 文件！');
+        showSuccess('完整备份已导出（含域名与通知设置）！\\n备份文件包含 Bot Token，请妥善保管。');
     } catch (error) {
-        console.error('导出数据失败:', error);
-        showError('导出数据失败: ' + error.message);
+        console.error('导出备份失败:', error);
+        showError('导出备份失败: ' + error.message);
     }
 }
 
@@ -267,7 +267,7 @@ function importData() {
     fileInput.onchange = async (event) => {
         const file = event.target.files[0];
         if (!file) return;
-        if (!(await showConfirm(\`确定要导入文件 \${file.name} 吗？\\n警告: 这将替换所有现有域名数据!\`))) {
+        if (!(await showConfirm(\`确定要导入文件 \${file.name} 吗？\\n警告: 这将替换所有现有域名数据！\\n完整备份文件还会一并覆盖通知设置，旧版纯域名文件只恢复域名。\`))) {
             fileInput.value = '';
             return;
         }
@@ -277,23 +277,47 @@ function importData() {
             reader.onload = async (e) => {
                 try {
                     const jsonContent = e.target.result;
-                    const domainsToImport = JSON.parse(jsonContent);
-                    if (!Array.isArray(domainsToImport)) { throw new Error('JSON 文件格式错误，须为域名数组'); }
+                    const parsed = JSON.parse(jsonContent);
 
-                    const response = await fetch(DOMAINS_API, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(domainsToImport),
-                    });
+                    // 旧版格式：纯域名数组 → 只恢复域名（PUT /api/domains）
+                    if (Array.isArray(parsed)) {
+                        const response = await fetch(DOMAINS_API, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(parsed),
+                        });
 
-                    if (!response.ok) {
-                        const errorData = await response.json().catch(() => ({ error: '服务器错误' }));
-                        throw new Error(errorData.error || response.statusText);
+                        if (!response.ok) {
+                            const errorData = await response.json().catch(() => ({ error: '服务器错误' }));
+                            throw new Error(errorData.error || response.statusText);
+                        }
+
+                        const result = await response.json();
+                        showSuccess(\`数据导入成功！共导入 \${result.count} 个域名\`);
+                        await fetchDomains();
+                        return;
                     }
-                    
-                    const result = await response.json();
-                    showSuccess(\`数据导入成功！共导入 \${result.count} 个域名\`);
-                    await fetchDomains();
+
+                    // 新版完整备份：{ domains: [...], notify: {...} } → 域名 + 通知设置一并恢复
+                    if (parsed && Array.isArray(parsed.domains)) {
+                        const response = await fetch('/api/backup', {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(parsed),
+                        });
+
+                        if (!response.ok) {
+                            const errorData = await response.json().catch(() => ({ error: '服务器错误' }));
+                            throw new Error(errorData.error || response.statusText);
+                        }
+
+                        const result = await response.json();
+                        showSuccess(\`备份恢复成功！共恢复 \${result.domainsCount} 个域名\` + (result.notifyRestored ? '，通知设置已一并恢复' : ''));
+                        await fetchDomains();
+                        return;
+                    }
+
+                    throw new Error('JSON 文件格式错误，须为域名数组或完整备份文件');
                 } catch (jsonError) {
                     console.error('导入文件处理失败:', jsonError);
                     showError('导入文件处理失败: ' + jsonError.message);

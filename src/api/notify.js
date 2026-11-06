@@ -21,8 +21,14 @@ function parseDays(value) {
     return n;
 }
 
+// 保存面板配置到 KV（供通知设置与备份恢复共用）
+export async function saveNotifyConfig(env, cfg) {
+    if (!env.DOMAIN_KV) throw new Error('未配置 KV 命名空间 DOMAIN_KV');
+    await env.DOMAIN_KV.put(NOTIFY_KEY, JSON.stringify(cfg));
+}
+
 // 读取 KV 中保存的面板配置（原始对象，可能为 null）
-async function getStoredNotify(env) {
+export async function getStoredNotify(env) {
     if (!env.DOMAIN_KV) return null;
     try {
         const stored = await env.DOMAIN_KV.get(NOTIFY_KEY, { type: 'json' });
@@ -144,7 +150,7 @@ export async function onRequest(context) {
         if (!env.DOMAIN_KV) {
             return jsonResponse({ success: false, error: '未配置 KV 命名空间 DOMAIN_KV' }, 500);
         }
-        await env.DOMAIN_KV.put(NOTIFY_KEY, JSON.stringify(next));
+        await saveNotifyConfig(env, next);
 
         const saved = await getNotifyConfig(env);
         return jsonResponse({ success: true, ...toPublicView(saved) });

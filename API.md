@@ -95,6 +95,45 @@ curl -X POST https://your-domain-check.workers.dev/api/notify-test \
 
 失败时 `error` 透传 Telegram 的 HTTP 状态与 description，不会假报成功。
 
+## GET /api/backup —— 导出完整备份（需要鉴权）
+
+导出域名列表 + 通知设置。注意：通知设置含**完整 Bot Token**（面板接口只返回脱敏值，备份为可恢复必须含完整值），请勿把备份文件外传。
+
+```bash
+curl -X GET https://your-domain-check.workers.dev/api/backup \
+     -H "Cookie: auth=<登录 Cookie>"
+```
+
+返回示例：
+
+```json
+{
+  "app": "domain-check",
+  "version": 1,
+  "exportedAt": "2026-11-06T10:00:00.000Z",
+  "domains": [ { "domain": "example.com", "expirationDate": "2027-01-01" } ],
+  "notify": { "enabled": true, "tgChatId": "123456", "tgBotToken": "123456:ABC-...", "days": 30, "notifyExpired": true }
+}
+```
+
+## PUT /api/backup —— 恢复完整备份（需要鉴权）
+
+- 请求体为 GET 导出的备份对象。恢复前整体校验（域名条目须含 domain、提醒天数须为 1~365），校验失败返回 400 且不写入任何数据。
+- `notify` 缺失时只恢复域名，不动现有通知设置；旧版纯域名数组文件请走 `PUT /api/domains`。
+
+```bash
+curl -X PUT https://your-domain-check.workers.dev/api/backup \
+     -H "Content-Type: application/json" \
+     -H "Cookie: auth=<登录 Cookie>" \
+     -d @domain-check_backup_2026-11-06.json
+```
+
+返回示例：
+
+```json
+{ "success": true, "domainsCount": 12, "notifyRestored": true }
+```
+
 ## GET 或 POST /cron —— 手动检查域名到期情况
 
 - 鉴权：已设置 `PASSWORD` 时需携带登录 Cookie（与 `/api/*` 一致）；未设置密码时公开。定时触发器（scheduled）不受此限制。

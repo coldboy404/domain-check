@@ -14,6 +14,7 @@ import { onRequest as configApi } from './api/config';
 import { onRequest as domainsApi } from './api/domains';
 import { onRequest as whoisApi } from './api/whois';
 import { onRequest as notifyApi, onRequestTest as notifyTestApi } from './api/notify';
+import { onRequest as backupApi } from './api/backup';
 import { checkDomainsScheduled } from './cron';
 import { authenticate, handleLogin } from './auth';
 import { getDomainsFromKV } from './api/domains';
@@ -121,6 +122,7 @@ export default {
             }
             const context = { request, env, ctx, next: () => {} };
             if (pathname === '/api/domains') { return domainsApi(context); }
+            if (pathname === '/api/backup') { return backupApi(context); }
             if (pathname === '/api/notify-config') { return notifyApi(context); }
             if (pathname === '/api/notify-test') {
                 if (request.method !== 'POST') {
