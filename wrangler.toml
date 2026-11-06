@@ -3,9 +3,12 @@ main = "src/index.js"
 compatibility_date = "2025-11-17"
 keep_vars = true
 
+# KV 不写 id：wrangler deploy 时会自动在目标账号创建命名空间并绑定，
+# 任何账号（含 fork 后在 CF 后台直连 GitHub）部署都不用改这里。
+# 如需绑定已有命名空间，在 binding 下方手动加一行：id = "你的KV_ID"
+# （GitHub Actions 部署时若设置了 CF_KV_ID secret，会自动注入这一行）
 [[kv_namespaces]]
-binding = "DOMAIN_KV" 
-id = "{CF_KV_ID}" # action部署时被变量替换
+binding = "DOMAIN_KV"
 
 [triggers]
-crons = ["{CF_CRONS}"] # action部署时被变量替换，默认为北京时间 9:00 和 21:00
+crons = ["0 1,13 * * *"] # 默认北京时间 9:00 和 21:00 各检查一次，可在 CF 后台或用 CF_CRONS 变量覆盖

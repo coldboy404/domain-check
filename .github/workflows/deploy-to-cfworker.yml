@@ -32,12 +32,18 @@ jobs:
       - name: 🆙 更新并安装最新 Wrangler
         run: npm install -g wrangler@latest
 
-      - name: 🔄 替换 wrangler.toml 中的变量
+      - name: 🔄 处理 wrangler.toml（注入已有 KV / 自定义 Cron，均可选）
         id: config_setup
         run: |
-          [ -n "${CF_KV_ID}" ] || { echo "🔴 错误: 必须设置 'CF_KV_ID' 变量"; exit 1; }  
-          sed -i "s#{CF_KV_ID}#${CF_KV_ID}#g" wrangler.toml
-          sed -i "s#{CF_CRONS}#${CF_CRONS}#g" wrangler.toml
+          # 设置了 CF_KV_ID 时注入 id 绑定已有 KV；未设置则部署时自动创建新 KV
+          if [ -n "${CF_KV_ID}" ]; then
+            sed -i "/binding = \"DOMAIN_KV\"/a id = \"${CF_KV_ID}\"" wrangler.toml
+            echo "✅ 已注入现有 KV id，将绑定到已有命名空间"
+          else
+            echo "ℹ️ 未设置 CF_KV_ID，部署时将自动创建 KV 命名空间"
+          fi
+          # CF_CRONS 有默认值，始终覆盖默认触发时间（未自定义时写回同值）
+          sed -i "s#^crons = .*#crons = [\"${CF_CRONS}\"]#" wrangler.toml
 
           WORKER_NAME=$(grep '^name =' wrangler.toml | awk -F '"' '{print $2}')
           [ -n "$WORKER_NAME" ] || { echo "🔴 错误: 未能在 wrangler.toml 中找到 'name' 字段"; exit 1; }

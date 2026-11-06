@@ -27,6 +27,7 @@
 - 📩 **cron 汇总推送**：到期检查改为合并一条汇总消息（已过期 / 即将到期分组），新增每日防重复（同一天相同域名集合不重复发送，`/cron?force=1` 可强制重发），手动触发 `/cron` 在设置密码后需鉴权
 - 🔐 **登录加固**：登录 Cookie 改为密码的 SHA-256 哈希（旧 Cookie 失效，需重新登录一次）；后端通知字段与前端渲染全面 HTML 转义，公开页注入数据防 `</script>` 逃逸，HTML 响应新增 nosniff / Referrer-Policy 响应头
 - 💾 **完整备份**：「导出」升级为完整备份（域名列表 + 通知设置，含 Bot Token），换账号/换 KV 一键恢复；「导入」同时兼容新版备份与旧版纯域名文件，恢复前会整体校验、校验失败不写入
+- 🚀 **部署不再绑账号**：`wrangler.toml` 去掉 `{CF_KV_ID}` / `{CF_CRONS}` 占位符，KV 只写 binding、首次部署自动创建并绑定，Cron 写默认时间；CF 后台直连 GitHub 部署不再报 10042。Actions 流程改为可选注入：设了 `CF_KV_ID` 才绑已有 KV，设了 `CF_CRONS` 才覆盖默认时间
 
 ### 2025-07-04
 - ✨ **新增续期功能**：域名卡片新增「续期」按钮，支持年/月续费，自动更新到期时间并记录续费周期
@@ -85,23 +86,25 @@
 ## 部署平台：Cloudflare Workers
 
 > [!TIP]
-> 放弃在CF网页管理后台直接链接仓库部署的方式  
-> 此对于kv空间绑定和定时触发器的设置完全依赖于 wrangler.toml  
-> 如果 wrangler.toml 没有进行配置，则项目在重新部署后会丢失参数，导致kv空间绑定以及定时器丢失  
-> 这是CF worker 链接仓库部署一直以来的bug  
-> **因此，项目部署方式改为 github action，以确保相关参数配置持久化**  
+> 两种部署方式都可以：**GitHub Actions**（下方流程）或 **CF 后台直接连接 GitHub 部署**。  
+> `wrangler.toml` 不写死任何账号的 KV id（只写 binding），首次部署时 Wrangler 会自动在目标账号创建 KV 命名空间并绑定，后续部署自动沿用，不会丢绑定；Cron 触发时间也直接写在 `wrangler.toml` 里（默认北京时间 9:00 / 21:00）。
 
 ### 前置条件
 - 先给把本项目点个⭐，再 Fork，[点击直达](https://github.com/yutian81/domain-check/fork)
-- 在 [Cloudflare](https://dash.cloudflare.com) 创建一个 KV 空间，名称随意，例如：`DOMAIN_KV`
-- 创建完KV后，KV名称右侧有一串字符，就是KV的ID值，保存下来备用
+- 无需提前创建 KV：首次部署自动创建并绑定
+- （可选）如要绑定**已有**的 KV 命名空间：记下它的 ID，Actions 部署填到 `CF_KV_ID` secret；直连部署则在 `wrangler.toml` 的 `binding = "DOMAIN_KV"` 下方手动加一行 `id = "你的KV_ID"`
 
-### 设置仓库 action
+### 方式二：CF 后台直连 GitHub 部署（简易）
+
+- 在 [Cloudflare](https://dash.cloudflare.com) → Workers & Pages → 创建 → 连接 GitHub 仓库，构建设置保持默认（部署命令 `npx wrangler deploy`）直接部署
+- 部署成功后进入该 Worker 的「设置 → 变量和机密」，添加 `PASSWORD`（管理页密码）后重新部署/等待生效；TG 通知直接到管理面板「通知」里设置，不用再配环境变量
+
+### 方式一：设置仓库 action（GitHub Actions 部署）
 
 - 点开仓库 `settings` → `Secrets and variables` → `Actions`
 - 设置如下 `secrets`:
   - **CF_API_TOKEN**: 必须，需要 worker 和 kv 权限
-  - **CF_KV_ID**: 必须，创建KV得到的ID值
+  - **CF_KV_ID**: 可选，仅绑定已有 KV 时填写；不填则部署时自动创建新 KV
   - **PASSWORD**: 必须，访问管理页的密码，默认为 `123123`
   - **TGID**: 可选兜底，tg机器人ID。优先在管理面板「通知」设置中填写，面板配置优先生效
   - **TGTOKEN**: 可选兜底，tg机器人token。优先在管理面板「通知」设置中填写，面板配置优先生效
