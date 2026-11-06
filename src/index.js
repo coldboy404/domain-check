@@ -5,14 +5,15 @@
 //   /admin    → 管理页面（需密码鉴权，可操作）
 //   /login    → 登录页（POST 成功后跳转 /admin）
 //   /logout   → 清除 Cookie，跳转回 /
-//   /api/*    → 全部 API 均需鉴权（公开页不调用 API）
-//   /cron     → 手动触发定时检查（公开）
+//   /api/*    → 全部 API 均需鉴权（公开页不调用 API；/api/config、/api/whois 除外，见下方公开端点）
+//   /cron     → 手动触发定时检查（已设置密码时需鉴权，未设置密码时公开；支持 ?force=1 绕过防重复）
 
 import { getConfig } from './utils';
 import { HTML_TEMPLATE } from '../frontend/index';
 import { onRequest as configApi } from './api/config';
 import { onRequest as domainsApi } from './api/domains';
 import { onRequest as whoisApi } from './api/whois';
+import { onRequest as notifyApi, onRequestTest as notifyTestApi } from './api/notify';
 import { checkDomainsScheduled } from './cron';
 import { authenticate, handleLogin } from './auth';
 import { getDomainsFromKV } from './api/domains';
@@ -75,20 +76,29 @@ export default {
             return whoisApi(context, domain);
         }
 
-        // 手动触发定时检查
+        // 手动触发定时检查：已设置密码时需鉴权（与 /api/* 一致），未设置时保持公开
         if (pathname === '/cron') {
             if (request.method !== 'GET' && request.method !== 'POST') {
                 return new Response('Method Not Allowed', { status: 405 });
             }
+            if (config.password) {
+                const authResponse = await authenticate(request, env);
+                if (authResponse) return authResponse;
+            }
             try {
-                const expiringDomains = await checkDomainsScheduled(env); 
+                const force = url.searchParams.get('force') === '1';
+                const cronResult = await checkDomainsScheduled(env, { force });
+                const expiringDomains = cronResult.domains || [];
                 const responseBody = {
                     success: true,
-                    message: expiringDomains.length > 0 
-                             ? `${expiringDomains.length} 个域名即将到期`
+                    message: expiringDomains.length > 0
+                             ? `${expiringDomains.length} 个域名即将到期或已过期`
                              : "没有即将到期的域名",
                     expiringCount: expiringDomains.length,
-                    domains: expiringDomains
+                    domains: expiringDomains,
+                    notified: Boolean(cronResult.notified),
+                    ...(cronResult.notifyError ? { notifyError: cronResult.notifyError } : {}),
+                    ...(cronResult.skippedReason ? { skippedReason: cronResult.skippedReason } : {})
                 };
                 return new Response(JSON.stringify(responseBody), {
                     headers: { 'Content-Type': 'application/json' },
@@ -111,6 +121,13 @@ export default {
             }
             const context = { request, env, ctx, next: () => {} };
             if (pathname === '/api/domains') { return domainsApi(context); }
+            if (pathname === '/api/notify-config') { return notifyApi(context); }
+            if (pathname === '/api/notify-test') {
+                if (request.method !== 'POST') {
+                    return new Response('Method Not Allowed', { status: 405 });
+                }
+                return notifyTestApi(context);
+            }
             return new Response('API Not Found', { status: 404 });
         }
 
@@ -123,9 +140,11 @@ export default {
                 false, // isAdmin = false
                 maskedDomains // 服务端已脱敏的域名列表
             ), {
-                headers: { 
+                headers: {
                     'Content-Type': 'text/html;charset=UTF-8',
-                    'Cache-Control': 'no-cache, no-store, must-revalidate'
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'X-Content-Type-Options': 'nosniff',
+                    'Referrer-Policy': 'same-origin'
                 }
             });
         }
@@ -141,9 +160,11 @@ export default {
                 config.githubURL, config.blogURL, config.blogName,
                 true // isAdmin = true
             ), {
-                headers: { 
+                headers: {
                     'Content-Type': 'text/html;charset=UTF-8',
-                    'Cache-Control': 'no-cache, no-store, must-revalidate'
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'X-Content-Type-Options': 'nosniff',
+                    'Referrer-Policy': 'same-origin'
                 }
             });
         }

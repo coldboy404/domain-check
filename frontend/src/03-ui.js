@@ -51,7 +51,7 @@ function renderSummary(domainsList) {
 function renderGroupTags(groupsStr) {
     if (!groupsStr) return '<span class="group-tag tag-ungrouped">未分组</span>';
     const tags = groupsStr.split(',').map(g => g.trim()).filter(g => g).map(g =>
-        `<span class="group-tag">${g}</span>`
+        `<span class="group-tag">${escapeHtml(g)}</span>`
     ).join('');
     return `<span class="group-tags-container">${tags}</span>`;
 }
@@ -69,12 +69,12 @@ function renderGroupTabs() {
 
     let html = '';
     existingGroups.forEach(g => {
-        html += `<button class="tab-btn ${currentGroup === g ? 'active' : ''}" data-group="${g}">${g}</button>`;
+        html += `<button class="tab-btn ${currentGroup === g ? 'active' : ''}" data-group="${escapeHtml(g)}">${escapeHtml(g)}</button>`;
     });
 
     customGroups.forEach(g => {
         if (!existingGroups.includes(g)) {
-             html += `<button class="tab-btn ${currentGroup === g ? 'active' : ''}" data-group="${g}">${g}</button>`;
+             html += `<button class="tab-btn ${currentGroup === g ? 'active' : ''}" data-group="${escapeHtml(g)}">${escapeHtml(g)}</button>`;
         }
     });
 
@@ -111,33 +111,34 @@ function createDomainCard(info) {
         progressPercentText = 'N/A';
     }
 
-    // 根据模式构建卡片
-    const displayDomain = IS_ADMIN ? info.domain : maskDomain(info.domain);
-    const displayAccount = IS_ADMIN ? (info.registerAccount || 'N/A') : (info.registerAccount ? maskAccount(info.registerAccount) : 'N/A');
+    // 根据模式构建卡片（所有用户字段插入 HTML 前先转义）
+    const displayDomain = escapeHtml(IS_ADMIN ? info.domain : maskDomain(info.domain || ''));
+    const displayAccount = escapeHtml(IS_ADMIN ? (info.registerAccount || 'N/A') : (info.registerAccount ? maskAccount(info.registerAccount) : 'N/A'));
     const domainClass = IS_ADMIN ? 'card-domain' : 'card-domain-masked';
-    const checkboxHTML = IS_ADMIN ? `<input type="checkbox" class="card-checkbox" data-domain="${info.domain}">` : '';
+    const escapedDomain = escapeHtml(info.domain || '');
+    const checkboxHTML = IS_ADMIN ? `<input type="checkbox" class="card-checkbox" data-domain="${escapedDomain}">` : '';
     const actionsHTML = IS_ADMIN ? `
         <div class="card-actions">
             ${checkboxHTML}
             <div class="card-action-icons">
-                <i class="fas fa-copy card-action-icon copy-icon" data-domain="${info.domain}" title="克隆此卡片"></i>
-                <i class="fas fa-sync-alt card-action-icon renew-icon" data-domain="${info.domain}" title="续期"></i>
-                <i class="fas fa-edit card-action-icon edit-icon" data-domain="${info.domain}" title="编辑"></i>
-                <i class="fas fa-trash-alt card-action-icon delete-icon" data-domain="${info.domain}" title="删除"></i>
+                <i class="fas fa-copy card-action-icon copy-icon" data-domain="${escapedDomain}" title="克隆此卡片"></i>
+                <i class="fas fa-sync-alt card-action-icon renew-icon" data-domain="${escapedDomain}" title="续期"></i>
+                <i class="fas fa-edit card-action-icon edit-icon" data-domain="${escapedDomain}" title="编辑"></i>
+                <i class="fas fa-trash-alt card-action-icon delete-icon" data-domain="${escapedDomain}" title="删除"></i>
             </div>
         </div>` : '';
 
     return `
         <div class="domain-card" style="--status-color: ${statusColor}; --border-color: ${statusColor};">
             <div class="card-header">
-                <span class="${domainClass}" data-domain="${IS_ADMIN ? info.domain : ''}">${displayDomain}</span>
-                <span class="card-status">${statusText}</span>
+                <span class="${domainClass}" data-domain="${IS_ADMIN ? escapedDomain : ''}">${displayDomain}</span>
+                <span class="card-status">${escapeHtml(statusText)}</span>
             </div>
             <div class="card-info">
-                <p><strong><i class="fa fa-registered"></i> 注册商: </strong> <a href="${info.systemURL}" target="_blank" title="点击直达">${info.system || 'N/A'}</a></p>
+                <p><strong><i class="fa fa-registered"></i> 注册商: </strong> <a href="${escapeHtml(safeHttpUrl(info.systemURL))}" target="_blank" title="点击直达">${escapeHtml(info.system || 'N/A')}</a></p>
                 <p><strong><i class="fa fa-user"></i> 注册账号: </strong> ${displayAccount}</p>
-                <p><strong><i class="fa fa-calendar"></i> 注册时间: </strong> ${info.registrationDate || 'N/A'}</p>
-                <p><strong><i class="fa fa-calendar"></i> 到期时间: </strong> ${info.expirationDate || 'N/A'}</p>
+                <p><strong><i class="fa fa-calendar"></i> 注册时间: </strong> ${escapeHtml(info.registrationDate || 'N/A')}</p>
+                <p><strong><i class="fa fa-calendar"></i> 到期时间: </strong> ${escapeHtml(info.expirationDate || 'N/A')}</p>
                 <p>${renderGroupTags(info.groups)}</p>
             </div>
             <div class="card-footer">

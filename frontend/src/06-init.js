@@ -39,6 +39,25 @@ window.addEventListener('load', async () => {
             document.getElementById('domainForm').addEventListener('submit', submitDomainForm);
         }
 
+        // 通知设置：按钮打开弹窗、弹窗关闭、表单提交、测试推送、清除 Token
+        const notifyBtn = document.getElementById('notifySettingsBtn');
+        if (notifyBtn) {
+            notifyBtn.addEventListener('click', () => openNotifyModal());
+        }
+        const notifyModal = document.getElementById('notifyModal');
+        if (notifyModal) {
+            notifyModal.querySelector('.close-btn').addEventListener('click', () => notifyModal.style.display = 'none');
+            window.addEventListener('click', (event) => {
+                if (event.target === notifyModal) { notifyModal.style.display = 'none'; }
+            });
+            document.getElementById('notifyForm').addEventListener('submit', submitNotifyForm);
+            document.getElementById('notifyTestBtn').addEventListener('click', testNotify);
+            const clearTokenBtn = document.getElementById('notifyClearToken');
+            if (clearTokenBtn) {
+                clearTokenBtn.addEventListener('click', handleClearNotifyToken);
+            }
+        }
+
         // 续费弹窗事件
         const renewOverlay = document.getElementById('renewOverlay');
         if (renewOverlay) {

@@ -53,6 +53,7 @@ function generateAdminHeader(siteName) {
             <button id="exportDataBtn" class="action-btn export-btn"><i class="fas fa-download"></i> 导出</button>
             <button id="importDataBtn" class="action-btn import-btn"><i class="fas fa-upload"></i> 导入</button>
             <input type="file" id="importFileInput" accept=".json" style="display: none;">
+            <button id="notifySettingsBtn" class="action-btn notify-btn"><i class="fas fa-bell"></i> 通知</button>
             <button id="logoutBtn" class="action-btn logout-btn"><i class="fas fa-sign-out-alt"></i> 退出</button>
         </div>
     </div>`;
@@ -124,13 +125,56 @@ function generateFormModal() {
     </div>`;
 }
 
+function generateNotifyModal() {
+    return `
+    <div id="notifyModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>通知设置</h2>
+            <form id="notifyForm">
+                <div class="notify-check-row">
+                    <input type="checkbox" id="notifyEnabled">
+                    <label for="notifyEnabled">启用通知</label>
+                </div>
+
+                <label for="notifyToken"><i class="fab fa-telegram"></i> Bot Token</label>
+                <input type="password" id="notifyToken" placeholder="例如 123456:ABC-..." autocomplete="off">
+                <div>
+                    <button type="button" id="notifyClearToken" class="notify-clear-token">清除已存 Token</button>
+                </div>
+
+                <label for="notifyChatId"><i class="fa fa-user"></i> Chat ID</label>
+                <input type="text" id="notifyChatId" placeholder="个人为数字 ID，群组可为负数 ID（如 -100123456）" autocomplete="off">
+
+                <label for="notifyDays"><i class="fa fa-calendar"></i> 提前提醒天数</label>
+                <input type="number" id="notifyDays" min="1" max="365" placeholder="例如: 30">
+
+                <div class="notify-check-row">
+                    <input type="checkbox" id="notifyExpired">
+                    <label for="notifyExpired">已过期也提醒</label>
+                </div>
+
+                <div id="notifySourceHint" class="notify-hint"></div>
+                <p class="notify-hint">在面板保存后优先生效；环境变量 TGID/TGTOKEN 作为兜底。</p>
+
+                <div class="notify-actions">
+                    <button type="button" id="notifyTestBtn" class="notify-test-btn"><i class="fas fa-paper-plane"></i> 测试推送</button>
+                    <button type="submit"><i class="fa fa-save"></i> 保存设置</button>
+                </div>
+            </form>
+        </div>
+    </div>`;
+}
+
 export function HTML_TEMPLATE(siteName, siteIcon, bgimgURL, githubURL, blogURL, blogName, isAdmin = false, initialDomains = null) {
     const bgimgStyle = generateBgStyle(bgimgURL);
     const footerHTML = generateFooter(githubURL, blogURL, blogName);
     const headerHTML = isAdmin ? generateAdminHeader(siteName) : generatePublicHeader(siteName);
     const formModal = isAdmin ? generateFormModal() : '';
+    const notifyModal = isAdmin ? generateNotifyModal() : '';
     // 公开页面：将服务端脱敏后的域名数据嵌入 HTML（避免前端调用 API 暴露敏感数据）
-    const initialDomainsJSON = initialDomains ? JSON.stringify(initialDomains) : 'null';
+    // 转义 </ 防止数据中的 </script> 逃逸出脚本块
+    const initialDomainsJSON = initialDomains ? JSON.stringify(initialDomains).replace(/<\//g, '<\\/') : 'null';
     
     return `
 <!DOCTYPE html>
@@ -157,6 +201,8 @@ export function HTML_TEMPLATE(siteName, siteIcon, bgimgURL, githubURL, blogURL, 
     ${headerHTML}
 
     ${formModal}
+
+    ${notifyModal}
 
     <!-- 续费弹窗（复用 toast 样式） -->
     <div id="renewOverlay" class="toast-overlay" style="display:none;">

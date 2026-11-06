@@ -59,6 +59,8 @@ export const HTML_CSS = `
 .logout-btn:hover { background-color: var(--danger-hover); }
 .select-btn { background-color: #8e44ad; color: white; }
 .select-btn:hover { background-color: #7d3c9a; }
+.notify-btn { background-color: #e67e22; color: white; }
+.notify-btn:hover { background-color: #d35400; }
 .del-btn { background-color: var(--danger); color: white; }
 .del-btn:hover { background-color: var(--danger-hover); }
 
@@ -375,6 +377,9 @@ export const HTML_CSS = `
 .modal-content input[type="text"],
 .modal-content input[type="date"],
 .modal-content input[type="url"],
+.modal-content input[type="password"],
+.modal-content input[type="number"],
+.modal-content select,
 .renewal-group input[type="number"],
 .renewal-group select {
     width: 100%;
@@ -508,6 +513,64 @@ export const HTML_CSS = `
     width: 100%;
     border-radius: 8px;
 }
+
+/* 通知设置弹窗 */
+.notify-check-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 10px 0;
+}
+.notify-check-row input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--primary);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.notify-check-row label {
+    display: inline;
+    margin-top: 0;
+    font-weight: bold;
+    cursor: pointer;
+}
+.notify-hint {
+    font-size: 0.82rem;
+    color: #777;
+    margin: 6px 0;
+    line-height: 1.5;
+}
+.notify-clear-token {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0 0 8px 0;
+    color: var(--danger);
+    font-size: 0.82rem;
+    cursor: pointer;
+    text-decoration: underline;
+}
+.notify-clear-token:hover { color: var(--danger-hover); }
+.notify-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+.notify-actions button[type="submit"] { flex: 1; width: auto; }
+.modal-content .notify-actions button[type="submit"] { width: auto; }
+.notify-test-btn {
+    background-color: #e67e22;
+    font-size: 16px;
+    color: white;
+    padding: 10px 20px;
+    margin: 8px 0;
+    border: none;
+    cursor: pointer;
+    flex: 1;
+    border-radius: 8px;
+}
+.notify-test-btn:hover { background-color: #d35400; }
+.notify-test-btn:disabled { background-color: #ccc; cursor: not-allowed; }
 
 .footer {
     background-color: none;

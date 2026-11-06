@@ -1,5 +1,29 @@
 // 01-utils.js — 工具函数
 
+// HTML 转义：用户字段插入 HTML 前必须转义（含引号，防止属性逃逸）
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+// 只允许 http/https 的 URL，其余返回 '#'
+function safeHttpUrl(url) {
+    if (!url) return '#';
+    const trimmed = String(url).trim();
+    try {
+        const parsed = new URL(trimmed);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return trimmed;
+        return '#';
+    } catch (e) {
+        return '#';
+    }
+}
+
 // 格式化日期为 YYYY-MM-DD
 function formatDate(date) {
     const d = new Date(date);

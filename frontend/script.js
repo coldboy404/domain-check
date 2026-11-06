@@ -15,6 +15,30 @@ let lastOperatedDomain = null; // 存储最近操作的域名，用于临时置�
 
 // 01-utils.js — 工具函数
 
+// HTML 转义：用户字段插入 HTML 前必须转义（含引号，防止属性逃逸）
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+// 只允许 http/https 的 URL，其余返回 '#'
+function safeHttpUrl(url) {
+    if (!url) return '#';
+    const trimmed = String(url).trim();
+    try {
+        const parsed = new URL(trimmed);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return trimmed;
+        return '#';
+    } catch (e) {
+        return '#';
+    }
+}
+
 // 格式化日期为 YYYY-MM-DD
 function formatDate(date) {
     const d = new Date(date);
@@ -544,7 +568,7 @@ function renderSummary(domainsList) {
 function renderGroupTags(groupsStr) {
     if (!groupsStr) return '<span class="group-tag tag-ungrouped">未分组</span>';
     const tags = groupsStr.split(',').map(g => g.trim()).filter(g => g).map(g =>
-        \`<span class="group-tag">\${g}</span>\`
+        \`<span class="group-tag">\${escapeHtml(g)}</span>\`
     ).join('');
     return \`<span class="group-tags-container">\${tags}</span>\`;
 }
@@ -562,12 +586,12 @@ function renderGroupTabs() {
 
     let html = '';
     existingGroups.forEach(g => {
-        html += \`<button class="tab-btn \${currentGroup === g ? 'active' : ''}" data-group="\${g}">\${g}</button>\`;
+        html += \`<button class="tab-btn \${currentGroup === g ? 'active' : ''}" data-group="\${escapeHtml(g)}">\${escapeHtml(g)}</button>\`;
     });
 
     customGroups.forEach(g => {
         if (!existingGroups.includes(g)) {
-             html += \`<button class="tab-btn \${currentGroup === g ? 'active' : ''}" data-group="\${g}">\${g}</button>\`;
+             html += \`<button class="tab-btn \${currentGroup === g ? 'active' : ''}" data-group="\${escapeHtml(g)}">\${escapeHtml(g)}</button>\`;
         }
     });
 
@@ -604,33 +628,34 @@ function createDomainCard(info) {
         progressPercentText = 'N/A';
     }
 
-    // 根据模式构建卡片
-    const displayDomain = IS_ADMIN ? info.domain : maskDomain(info.domain);
-    const displayAccount = IS_ADMIN ? (info.registerAccount || 'N/A') : (info.registerAccount ? maskAccount(info.registerAccount) : 'N/A');
+    // 根据模式构建卡片（所有用户字段插入 HTML 前先转义）
+    const displayDomain = escapeHtml(IS_ADMIN ? info.domain : maskDomain(info.domain || ''));
+    const displayAccount = escapeHtml(IS_ADMIN ? (info.registerAccount || 'N/A') : (info.registerAccount ? maskAccount(info.registerAccount) : 'N/A'));
     const domainClass = IS_ADMIN ? 'card-domain' : 'card-domain-masked';
-    const checkboxHTML = IS_ADMIN ? \`<input type="checkbox" class="card-checkbox" data-domain="\${info.domain}">\` : '';
+    const escapedDomain = escapeHtml(info.domain || '');
+    const checkboxHTML = IS_ADMIN ? \`<input type="checkbox" class="card-checkbox" data-domain="\${escapedDomain}">\` : '';
     const actionsHTML = IS_ADMIN ? \`
         <div class="card-actions">
             \${checkboxHTML}
             <div class="card-action-icons">
-                <i class="fas fa-copy card-action-icon copy-icon" data-domain="\${info.domain}" title="克隆此卡片"></i>
-                <i class="fas fa-sync-alt card-action-icon renew-icon" data-domain="\${info.domain}" title="续期"></i>
-                <i class="fas fa-edit card-action-icon edit-icon" data-domain="\${info.domain}" title="编辑"></i>
-                <i class="fas fa-trash-alt card-action-icon delete-icon" data-domain="\${info.domain}" title="删除"></i>
+                <i class="fas fa-copy card-action-icon copy-icon" data-domain="\${escapedDomain}" title="克隆此卡片"></i>
+                <i class="fas fa-sync-alt card-action-icon renew-icon" data-domain="\${escapedDomain}" title="续期"></i>
+                <i class="fas fa-edit card-action-icon edit-icon" data-domain="\${escapedDomain}" title="编辑"></i>
+                <i class="fas fa-trash-alt card-action-icon delete-icon" data-domain="\${escapedDomain}" title="删除"></i>
             </div>
         </div>\` : '';
 
     return \`
         <div class="domain-card" style="--status-color: \${statusColor}; --border-color: \${statusColor};">
             <div class="card-header">
-                <span class="\${domainClass}" data-domain="\${IS_ADMIN ? info.domain : ''}">\${displayDomain}</span>
-                <span class="card-status">\${statusText}</span>
+                <span class="\${domainClass}" data-domain="\${IS_ADMIN ? escapedDomain : ''}">\${displayDomain}</span>
+                <span class="card-status">\${escapeHtml(statusText)}</span>
             </div>
             <div class="card-info">
-                <p><strong><i class="fa fa-registered"></i> 注册商: </strong> <a href="\${info.systemURL}" target="_blank" title="点击直达">\${info.system || 'N/A'}</a></p>
+                <p><strong><i class="fa fa-registered"></i> 注册商: </strong> <a href="\${escapeHtml(safeHttpUrl(info.systemURL))}" target="_blank" title="点击直达">\${escapeHtml(info.system || 'N/A')}</a></p>
                 <p><strong><i class="fa fa-user"></i> 注册账号: </strong> \${displayAccount}</p>
-                <p><strong><i class="fa fa-calendar"></i> 注册时间: </strong> \${info.registrationDate || 'N/A'}</p>
-                <p><strong><i class="fa fa-calendar"></i> 到期时间: </strong> \${info.expirationDate || 'N/A'}</p>
+                <p><strong><i class="fa fa-calendar"></i> 注册时间: </strong> \${escapeHtml(info.registrationDate || 'N/A')}</p>
+                <p><strong><i class="fa fa-calendar"></i> 到期时间: </strong> \${escapeHtml(info.expirationDate || 'N/A')}</p>
                 <p>\${renderGroupTags(info.groups)}</p>
             </div>
             <div class="card-footer">
@@ -899,7 +924,7 @@ function updateGroupsHiddenInput() {
     document.getElementById('groups').value = tags.join(', ');
 }
 
-// 添加一个分组标签
+// 添加一个分组标签（用 DOM API + textContent 拼装，避免分组名注入 HTML）
 function addGroupTag(name) {
     name = name.trim();
     if (!name) return;
@@ -910,19 +935,25 @@ function addGroupTag(name) {
     const tag = document.createElement('span');
     tag.className = 'group-tag';
     tag.dataset.group = name;
-    tag.innerHTML = \`\${name}<span class="group-tag-remove" data-group="\${name}">&times;</span>\`;
+    tag.appendChild(document.createTextNode(name));
+    const removeBtn = document.createElement('span');
+    removeBtn.className = 'group-tag-remove';
+    removeBtn.dataset.group = name;
+    removeBtn.textContent = '×';
+    removeBtn.addEventListener('click', () => removeGroupTag(name));
+    tag.appendChild(removeBtn);
     tagList.appendChild(tag);
 
-    tag.querySelector('.group-tag-remove').addEventListener('click', () => removeGroupTag(name));
     tagList.classList.add('has-tags');
     updateGroupsHiddenInput();
 }
 
-// 删除一个分组标签
+// 删除一个分组标签（按 dataset 值逐个比对，避免选择器注入）
 function removeGroupTag(name) {
-    const tag = document.querySelector(\`#groupsTagList .group-tag[data-group="\${name}"]\`);
-    if (tag) tag.remove();
     const tagList = document.getElementById('groupsTagList');
+    tagList.querySelectorAll('.group-tag').forEach(tag => {
+        if (tag.dataset.group === name) tag.remove();
+    });
     if (!tagList.querySelector('.group-tag')) tagList.classList.remove('has-tags');
     updateGroupsHiddenInput();
 }
@@ -953,7 +984,7 @@ function showGroupsDropdown(filter) {
     }
 
     dropdown.innerHTML = filtered.map(g =>
-        \`<div class="autocomplete-dropdown-item" data-group="\${g}">\${g}</div>\`
+        \`<div class="autocomplete-dropdown-item" data-group="\${escapeHtml(g)}">\${escapeHtml(g)}</div>\`
     ).join('');
     dropdown.style.display = 'block';
 }
@@ -1008,7 +1039,7 @@ function showAutocompleteDropdown(inputId, dropdownId, dataFn) {
     }
 
     dropdown.innerHTML = filtered.map(item =>
-        \`<div class="autocomplete-dropdown-item" data-value="\${item}">\${item}</div>\`
+        \`<div class="autocomplete-dropdown-item" data-value="\${escapeHtml(item)}">\${escapeHtml(item)}</div>\`
     ).join('');
     dropdown.style.display = 'block';
 }
@@ -1069,6 +1100,132 @@ async function submitRenew() {
         await fetchDomains();
     } catch (error) {
         showError('续费失败: ' + error.message);
+    }
+}
+
+// 09-notify.js — Telegram 通知设置面板
+
+const NOTIFY_CONFIG_API = '/api/notify-config';
+const NOTIFY_TEST_API = '/api/notify-test';
+let notifyClearTokenPending = false; // 「清除已存 Token」待提交标记
+
+// 配置来源文案
+function notifySourceText(source) {
+    if (source === 'kv') return '当前配置来源：面板配置';
+    if (source === 'env') return '当前配置来源：环境变量（TGID/TGTOKEN 兜底）';
+    return '当前配置来源：未配置';
+}
+
+// 按脱敏视图更新 Token 占位提示与来源提示
+function updateNotifyView(data) {
+    const tokenInput = document.getElementById('notifyToken');
+    if (tokenInput) {
+        if (data.hasToken) {
+            tokenInput.placeholder = '已配置（' + (data.tokenMasked || '****') + '），留空不修改';
+        } else {
+            tokenInput.placeholder = '例如 123456:ABC-...';
+        }
+    }
+    const hint = document.getElementById('notifySourceHint');
+    if (hint) hint.textContent = notifySourceText(data.source);
+}
+
+// 打开通知设置弹窗并加载当前配置（Token 不回填明文）
+async function openNotifyModal() {
+    const modal = document.getElementById('notifyModal');
+    if (!modal) return;
+    notifyClearTokenPending = false;
+    try {
+        const response = await fetch(NOTIFY_CONFIG_API);
+        if (!response.ok) throw new Error('获取通知配置失败');
+        const data = await response.json();
+        document.getElementById('notifyEnabled').checked = Boolean(data.enabled);
+        document.getElementById('notifyChatId').value = data.tgChatId || '';
+        document.getElementById('notifyDays').value = data.days || 30;
+        document.getElementById('notifyExpired').checked = Boolean(data.notifyExpired);
+        const tokenInput = document.getElementById('notifyToken');
+        tokenInput.value = '';
+        updateNotifyView(data);
+    } catch (error) {
+        console.error('获取通知配置失败:', error);
+        showError('获取通知配置失败: ' + error.message);
+        return;
+    }
+    modal.style.display = 'block';
+}
+
+// 点击「清除已存 Token」：置标记并更新提示，保存时带 clearToken
+function handleClearNotifyToken() {
+    notifyClearTokenPending = true;
+    const tokenInput = document.getElementById('notifyToken');
+    if (tokenInput) {
+        tokenInput.value = '';
+        tokenInput.placeholder = '已标记清除，保存后生效；如需取消请关闭弹窗重新打开';
+    }
+    showAlert('已标记清除已存 Token，点击「保存设置」后生效');
+}
+
+// 收集当前表单值
+function collectNotifyForm() {
+    const daysValue = parseInt(document.getElementById('notifyDays').value, 10);
+    return {
+        enabled: document.getElementById('notifyEnabled').checked,
+        tgChatId: document.getElementById('notifyChatId').value.trim(),
+        tgBotToken: document.getElementById('notifyToken').value.trim(),
+        days: isNaN(daysValue) ? undefined : daysValue,
+        notifyExpired: document.getElementById('notifyExpired').checked,
+        clearToken: notifyClearTokenPending
+    };
+}
+
+// 保存通知设置
+async function submitNotifyForm(e) {
+    e.preventDefault();
+    const payload = collectNotifyForm();
+    if (payload.days !== undefined && (payload.days < 1 || payload.days > 365)) {
+        showError('提前提醒天数必须是 1~365 的整数');
+        return;
+    }
+    try {
+        const response = await fetch(NOTIFY_CONFIG_API, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || response.statusText || '保存失败');
+        notifyClearTokenPending = false;
+        document.getElementById('notifyToken').value = '';
+        updateNotifyView(data);
+        showSuccess('通知设置已保存！');
+    } catch (error) {
+        console.error('保存通知设置失败:', error);
+        showError('保存通知设置失败: ' + error.message);
+    }
+}
+
+// 测试推送：带当前表单值发送，保存前也能测
+async function testNotify() {
+    const btn = document.getElementById('notifyTestBtn');
+    if (btn) btn.disabled = true;
+    try {
+        const payload = collectNotifyForm();
+        const response = await fetch(NOTIFY_TEST_API, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json().catch(() => ({}));
+        if (response.ok && data.success) {
+            showSuccess('测试推送成功，请检查 Telegram 是否收到消息！');
+        } else {
+            showError('测试推送失败: ' + (data.error || response.statusText || '未知错误'));
+        }
+    } catch (error) {
+        console.error('测试推送失败:', error);
+        showError('测试推送失败: ' + error.message);
+    } finally {
+        if (btn) btn.disabled = false;
     }
 }
 
@@ -1217,6 +1374,25 @@ window.addEventListener('load', async () => {
                 if (event.target === modal) { modal.style.display = 'none'; }
             });
             document.getElementById('domainForm').addEventListener('submit', submitDomainForm);
+        }
+
+        // 通知设置：按钮打开弹窗、弹窗关闭、表单提交、测试推送、清除 Token
+        const notifyBtn = document.getElementById('notifySettingsBtn');
+        if (notifyBtn) {
+            notifyBtn.addEventListener('click', () => openNotifyModal());
+        }
+        const notifyModal = document.getElementById('notifyModal');
+        if (notifyModal) {
+            notifyModal.querySelector('.close-btn').addEventListener('click', () => notifyModal.style.display = 'none');
+            window.addEventListener('click', (event) => {
+                if (event.target === notifyModal) { notifyModal.style.display = 'none'; }
+            });
+            document.getElementById('notifyForm').addEventListener('submit', submitNotifyForm);
+            document.getElementById('notifyTestBtn').addEventListener('click', testNotify);
+            const clearTokenBtn = document.getElementById('notifyClearToken');
+            if (clearTokenBtn) {
+                clearTokenBtn.addEventListener('click', handleClearNotifyToken);
+            }
         }
 
         // 续费弹窗事件

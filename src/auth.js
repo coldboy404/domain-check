@@ -2,6 +2,25 @@
 
 import { getConfig } from './utils';
 
+// 密码哈希：SHA-256('domain-check:' + password)，Cookie 中只存哈希，不存明文
+export async function hashPassword(password) {
+    const input = 'domain-check:' + (password ?? '');
+    const data = new TextEncoder().encode(input);
+    const digest = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// 定长安全比较（长度不同直接 false）
+export function timingSafeEqual(a, b) {
+    if (typeof a !== 'string' || typeof b !== 'string') return false;
+    if (a.length !== b.length) return false;
+    let diff = 0;
+    for (let i = 0; i < a.length; i++) {
+        diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+    }
+    return diff === 0;
+}
+
 // 认证逻辑
 export async function authenticate(request, env) {
     const config = getConfig(env);
@@ -11,8 +30,9 @@ export async function authenticate(request, env) {
         const match = cookie.match(/auth=([^;]+)/);
         if (match) authToken = match[1];
     }
-    const isAuthenticated = authToken === config.password;
-    if (isAuthenticated) return null; 
+    const expected = await hashPassword(config.password);
+    const isAuthenticated = authToken !== null && timingSafeEqual(authToken, expected);
+    if (isAuthenticated) return null;
 
     return Response.redirect(new URL('/login', request.url), 302);
 }
@@ -34,7 +54,8 @@ export async function handleLogin(request, env, redirectPath = '/') {
                 expires.setDate(expires.getDate() + 7);
                 const headers = new Headers();
                 headers.set('Location', redirectPath);
-                headers.set('Set-Cookie', `auth=${password}; Expires=${expires.toUTCString()}; HttpOnly; Path=/; Secure; SameSite=Lax`);
+                const authHash = await hashPassword(password);
+                headers.set('Set-Cookie', `auth=${authHash}; Expires=${expires.toUTCString()}; HttpOnly; Path=/; Secure; SameSite=Lax`);
                 return new Response(null, { status: 302, headers: headers });
             } else {
                 const html = generateLoginPage(true, config.siteName, config.siteIcon, config.bgimgURL, config.githubURL, config.blogURL, config.blogName);

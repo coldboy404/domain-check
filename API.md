@@ -28,32 +28,103 @@ curl -X GET https://your-domain-check.workers.dev/api/config
 }
 ```
 
-## GET 或 POST /cron —— 手动检查域名到期情况
+## GET /api/notify-config —— 获取 TG 通知配置（脱敏）
 
-- 请求示例（无需鉴权）
+- 请求示例（需要鉴权）
 
+```bash
+curl -X GET https://your-domain-check.workers.dev/api/notify-config \
+     -H "Cookie: auth=<登录 Cookie>"
 ```
-curl -X GET https://your-domain-check.workers.dev/cron
-# 或
-curl -X POST https://your-domain-check.workers.dev/cron
+
+- 返回示例（`tokenMasked` 只露末 4 位，接口绝不返回完整 Token）
+
+```json
+{
+  "enabled": true,
+  "tgChatId": "123456789",
+  "days": 30,
+  "notifyExpired": true,
+  "source": "kv",
+  "hasToken": true,
+  "tokenMasked": "****1234"
+}
+```
+
+字段说明：`source` 为 Token/Chat ID 的来源，`kv` = 面板配置、`env` = 环境变量兜底、`none` = 未配置。
+
+## PUT /api/notify-config —— 保存 TG 通知配置到 KV
+
+- 请求示例（需要鉴权）。`tgBotToken` 为空字符串或缺省时保留已存 Token；传 `clearToken: true` 显式清除；`days` 须为 1~365 的整数，缺省保留旧值；`tgChatId` 传空串表示清空。
+
+```bash
+curl -X PUT https://your-domain-check.workers.dev/api/notify-config \
+     -H "Content-Type: application/json" \
+     -H "Cookie: auth=<登录 Cookie>" \
+     -d '{
+            "enabled": true,
+            "tgChatId": "123456789",
+            "tgBotToken": "",
+            "days": 30,
+            "notifyExpired": true
+          }'
+```
+
+- 返回示例：与 GET 相同的脱敏视图，并带 `"success": true`。
+
+## POST /api/notify-test —— 发送 TG 测试推送
+
+- 请求示例（需要鉴权，仅允许 POST）。优先使用请求体中表单当前填写的 `tgChatId` / `tgBotToken`（Token 为空则用已存的），保存前即可测试；缺 Token/Chat ID 时返回 400 说明缺什么。
+
+```bash
+curl -X POST https://your-domain-check.workers.dev/api/notify-test \
+     -H "Content-Type: application/json" \
+     -H "Cookie: auth=<登录 Cookie>" \
+     -d '{ "tgChatId": "123456789", "tgBotToken": "" }'
 ```
 
 - 返回示例
 
 ```json
+{ "success": true }
+```
+
+```json
+{ "success": false, "error": "Telegram 返回 401: Unauthorized" }
+```
+
+失败时 `error` 透传 Telegram 的 HTTP 状态与 description，不会假报成功。
+
+## GET 或 POST /cron —— 手动检查域名到期情况
+
+- 鉴权：已设置 `PASSWORD` 时需携带登录 Cookie（与 `/api/*` 一致）；未设置密码时公开。定时触发器（scheduled）不受此限制。
+- 参数：`?force=1` 绕过每日防重复，强制重新发送汇总通知。
+
+- 请求示例
+
+```
+curl -X GET "https://your-domain-check.workers.dev/cron" -H "Cookie: auth=<登录 Cookie>"
+# 强制重发：
+curl -X GET "https://your-domain-check.workers.dev/cron?force=1" -H "Cookie: auth=<登录 Cookie>"
+# 或
+curl -X POST https://your-domain-check.workers.dev/cron -H "Cookie: auth=<登录 Cookie>"
+```
+
+- 返回示例（`domains` 含即将到期与已过期域名，汇总通知只发一条；`notified` 表示本次是否实际发送，跳过时有 `skippedReason`，发送失败时有 `notifyError`）
+
+```json
 {
   "success": true,
-  "message": "已找到 2 个即将到期的域名，Telegram通知已尝试发送。",
+  "message": "2 个域名即将到期或已过期",
   "expiringCount": 2,
   "domains": [
     {
       "domain": "example1.com",
       "expirationDate": "2025-01-01",
-      "daysRemaining": 15,
-      // ... 其他域名信息
-    },
-    // ...
-  ]
+      "daysRemaining": 15
+    }
+  ],
+  "notified": true
 }
 ```
 

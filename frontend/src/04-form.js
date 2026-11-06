@@ -151,7 +151,7 @@ function updateGroupsHiddenInput() {
     document.getElementById('groups').value = tags.join(', ');
 }
 
-// 添加一个分组标签
+// 添加一个分组标签（用 DOM API + textContent 拼装，避免分组名注入 HTML）
 function addGroupTag(name) {
     name = name.trim();
     if (!name) return;
@@ -162,19 +162,25 @@ function addGroupTag(name) {
     const tag = document.createElement('span');
     tag.className = 'group-tag';
     tag.dataset.group = name;
-    tag.innerHTML = `${name}<span class="group-tag-remove" data-group="${name}">&times;</span>`;
+    tag.appendChild(document.createTextNode(name));
+    const removeBtn = document.createElement('span');
+    removeBtn.className = 'group-tag-remove';
+    removeBtn.dataset.group = name;
+    removeBtn.textContent = '×';
+    removeBtn.addEventListener('click', () => removeGroupTag(name));
+    tag.appendChild(removeBtn);
     tagList.appendChild(tag);
 
-    tag.querySelector('.group-tag-remove').addEventListener('click', () => removeGroupTag(name));
     tagList.classList.add('has-tags');
     updateGroupsHiddenInput();
 }
 
-// 删除一个分组标签
+// 删除一个分组标签（按 dataset 值逐个比对，避免选择器注入）
 function removeGroupTag(name) {
-    const tag = document.querySelector(`#groupsTagList .group-tag[data-group="${name}"]`);
-    if (tag) tag.remove();
     const tagList = document.getElementById('groupsTagList');
+    tagList.querySelectorAll('.group-tag').forEach(tag => {
+        if (tag.dataset.group === name) tag.remove();
+    });
     if (!tagList.querySelector('.group-tag')) tagList.classList.remove('has-tags');
     updateGroupsHiddenInput();
 }
@@ -205,7 +211,7 @@ function showGroupsDropdown(filter) {
     }
 
     dropdown.innerHTML = filtered.map(g =>
-        `<div class="autocomplete-dropdown-item" data-group="${g}">${g}</div>`
+        `<div class="autocomplete-dropdown-item" data-group="${escapeHtml(g)}">${escapeHtml(g)}</div>`
     ).join('');
     dropdown.style.display = 'block';
 }
@@ -260,7 +266,7 @@ function showAutocompleteDropdown(inputId, dropdownId, dataFn) {
     }
 
     dropdown.innerHTML = filtered.map(item =>
-        `<div class="autocomplete-dropdown-item" data-value="${item}">${item}</div>`
+        `<div class="autocomplete-dropdown-item" data-value="${escapeHtml(item)}">${escapeHtml(item)}</div>`
     ).join('');
     dropdown.style.display = 'block';
 }
